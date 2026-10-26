@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AppShell from "../../components/layout/AppShell.jsx";
 import StatCard from "../../components/shared/StatCard.jsx";
 import { getClasses, getDashboardStats } from "../../services/schoolService.js";
+import { getClassDisplayName, getSectionLabel } from "../../lib/classDisplay.js";
 export default function DashboardPage({ directoryOnly = false }) {
   const stats = getDashboardStats(),
     classes = getClasses();
@@ -70,8 +71,8 @@ export default function DashboardPage({ directoryOnly = false }) {
                 </span>
               </div>
               <div className="class-title-row">
-                <h3>{room.name}</h3>
-                <span className="section-tag">Section {room.section}</span>
+                <h3>{getClassDisplayName(room.name)}</h3>
+                {getSectionLabel(room.section) && <span className="section-tag">{getSectionLabel(room.section)}</span>}
               </div>
               <div className="teacher-line">
                 <span className="teacher-avatar">

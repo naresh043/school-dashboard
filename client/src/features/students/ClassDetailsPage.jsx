@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import AppShell from "../../components/layout/AppShell.jsx";
+import StudentAvatar from "../../components/shared/StudentAvatar.jsx";
+import StudentProfileDialog from "./StudentProfileDialog.jsx";
 import { getClassById, getStudentsByClass } from "../../services/schoolService.js";
+import { formatClassLabel, getClassDisplayName, getSectionLabel } from "../../lib/classDisplay.js";
 export default function ClassDetailsPage() {
   const { classId } = useParams(),
     room = getClassById(classId),
@@ -14,7 +17,10 @@ export default function ClassDetailsPage() {
     [gender, setGender] = useState("All"),
     [pageSize, setPageSize] = useState(10),
     [pageState, setPageState] = useState({ index: 0, filterKey: "" }),
-    [sort, setSort] = useState({ key: "rollNumber", direction: "asc" });
+    [sort, setSort] = useState({ key: "rollNumber", direction: "asc" }),
+    [selectedStudentId, setSelectedStudentId] = useState(null);
+  const closeProfile = useCallback(() => setSelectedStudentId(null), []);
+  const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) || null;
   const normalized = query.trim().toLowerCase(),
     filterKey = `${normalized}|${gender}|${pageSize}|${sort.key}|${sort.direction}`,
     page = pageState.filterKey === filterKey ? pageState.index : 0;
@@ -73,7 +79,7 @@ export default function ClassDetailsPage() {
       sort.key === key ? (sort.direction === "asc" ? "↑" : "↓") : "↕";
   return (
     <AppShell
-      title={`${room.name} · Section ${room.section}`}
+      title={getClassDisplayName(room.name)}
       subtitle="A closer look at your class community."
     >
       <div className="class-back">
@@ -82,7 +88,7 @@ export default function ClassDetailsPage() {
         </Link>
         <span>/</span>
         <b>
-          {room.name} · {room.section}
+          {formatClassLabel(room.name, room.section)}
         </b>
       </div>
       <section className="class-overview">
@@ -93,7 +99,7 @@ export default function ClassDetailsPage() {
           <div>
             <span className="eyebrow">CLASS OVERVIEW</span>
             <h2>
-              {room.name} <span>· Section {room.section}</span>
+              {getClassDisplayName(room.name)} {getSectionLabel(room.section) && <span className="section-tag">{getSectionLabel(room.section)}</span>}
             </h2>
             <p>
               <span className="teacher-avatar">
@@ -193,17 +199,10 @@ export default function ClassDetailsPage() {
                   </td>
                   <td className="admission-cell">{s.admissionNumber}</td>
                   <td>
-                    <div className="student-name">
-                      <span
-                        className={`student-avatar ${s.gender === "Female" ? "girl-avatar" : ""}`}
-                      >
-                        {s.name
-                          .split(" ")
-                          .map((x) => x[0])
-                          .join("")}
-                      </span>
-                      <b>{s.name}</b>
-                    </div>
+                    <button className="student-name student-name-button" type="button" onClick={() => setSelectedStudentId(s.id)} aria-label={`Open profile for ${s.name}`}>
+                      <StudentAvatar student={s} size="table" />
+                      <b>{s.name || "Student"}</b>
+                    </button>
                   </td>
                   <td>
                     <span
@@ -214,7 +213,7 @@ export default function ClassDetailsPage() {
                   </td>
                   <td>
                     <span className="class-cell">
-                      {room.name} · {room.section}
+                      {formatClassLabel(room.name, room.section)}
                     </span>
                   </td>
                 </tr>
@@ -289,6 +288,7 @@ export default function ClassDetailsPage() {
           </div>
         </div>
       </section>
+      {selectedStudent && <StudentProfileDialog student={selectedStudent} room={room} onClose={closeProfile} />}
     </AppShell>
   );
 }
