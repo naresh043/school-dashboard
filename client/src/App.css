@@ -22,6 +22,61 @@ h1,h2,h3,.brand,.login-brand,.stat-value,.class-metrics strong,.overview-counts 
 .profile-details{display:grid;gap:4px}
 .profile-details b{font-size:13px;color:#26344b;padding:2px 5px}
 .profile-details small{font-size:11px;color:#64748b;padding:0 5px}
+
+/* Face attendance prototype */
+.attendance-notice{display:flex;align-items:flex-start;gap:12px;padding:15px 17px;border:1px solid #d9e5fb;background:#f3f7ff;border-radius:12px;color:#3559b4}
+.attendance-notice>svg{flex:none;margin-top:1px}
+.attendance-notice p{margin:0;font-size:13px;line-height:1.55;color:#435574}
+.attendance-notice b{color:#274fc7}
+.attendance-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(270px,.85fr);gap:18px;margin-top:18px;align-items:start}
+.attendance-camera-card,.attendance-status-card{min-width:0;padding:19px;background:#fff;border:1px solid #dce3ee;border-radius:14px;box-shadow:0 2px 7px #1c365308}
+.attendance-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.attendance-card-heading .eyebrow{margin:0 0 4px;font-size:10px}
+.attendance-card-heading h2{margin:0;font:700 19px/1.35 var(--heading-font);color:#172033;letter-spacing:-.35px}
+.attendance-state-pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #e3e8f0;border-radius:20px;padding:7px 10px;font-size:11px;color:#536179;background:#f8f9fc;white-space:nowrap}
+.attendance-state-pill.is-active{color:#237553;background:#eff9f4;border-color:#d9f0e3}
+.attendance-state-dot{width:7px;height:7px;border-radius:50%;background:#98a2b3;flex:none}
+.is-active .attendance-state-dot{background:#2ea66d;box-shadow:0 0 0 3px #def3e7}
+.camera-stage{position:relative;isolation:isolate;width:100%;aspect-ratio:16/9;min-height:220px;overflow:hidden;display:grid;place-items:center;border-radius:11px;background:#17243b;color:#fff}
+.camera-stage-active{background:#0d1728}
+.camera-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.face-box-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.face-box-overlay rect{fill:#29d58a20;stroke:#4be5a5;stroke-width:4;vector-effect:non-scaling-stroke}
+.camera-empty-state{position:relative;z-index:1;display:grid;justify-items:center;gap:9px;padding:20px;text-align:center}
+.camera-empty-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;color:#a9c0f2;background:#ffffff14}
+.camera-empty-state b{font-size:14px;color:#fff}
+.camera-empty-state>span:last-child{font-size:12px;color:#c0cadd}
+.camera-loading-state{position:absolute;z-index:2;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 20px);padding:8px 12px;border-radius:20px;background:#101a2bdc;color:#fff;font-size:11px;white-space:nowrap}
+.camera-spinner{width:14px;height:14px;border:2px solid #ffffff60;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.attendance-error{display:flex;gap:9px;align-items:flex-start;padding:11px 12px;margin-top:13px;border:1px solid #f2d2d7;border-radius:9px;background:#fff6f7;color:#a5364b;font-size:12px;line-height:1.5}
+.attendance-error svg{flex:none;margin-top:1px}
+.camera-controls{display:flex;gap:10px;margin-top:15px}
+.camera-controls .primary-button,.attendance-stop-button{min-height:44px;padding:0 16px;gap:8px}
+.camera-controls .primary-button:disabled{opacity:.56;cursor:not-allowed;box-shadow:none}
+.attendance-stop-button{display:inline-flex;align-items:center;justify-content:center;border:1px solid #dce3ee;border-radius:9px;background:#fff;color:#46546b;font-size:14px;font-weight:600;cursor:pointer}
+.attendance-stop-button:hover:not(:disabled){background:#f5f7fb;border-color:#c8d1df}
+.attendance-stop-button:disabled{opacity:.5;cursor:not-allowed}
+.attendance-side-column{display:grid;gap:18px}
+.attendance-status-card .attendance-card-heading{margin-bottom:12px}
+.detection-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:#eef3ff;color:#426cd0;flex:none}
+.detection-icon-found{background:#e9f8f0;color:#228258}
+.detection-status-text{min-height:56px;margin:0;color:#45546b;font-size:13px;line-height:1.55}
+.face-count-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px;padding:13px 0;border-top:1px solid #edf0f5;border-bottom:1px solid #edf0f5;color:#64748b;font-size:12px}
+.face-count-row b{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border-radius:10px;background:#f0f4fc;color:#274fc7;font:700 18px var(--heading-font)}
+.detection-limit-note,.local-processing-note{display:flex;align-items:flex-start;gap:7px;margin:12px 0 0;color:#718096;font-size:11px;line-height:1.5}
+.detection-limit-note svg,.local-processing-note svg{flex:none;margin-top:1px;color:#6882bb}
+.attendance-instructions{display:grid;gap:13px;padding:0;margin:0;list-style:none}
+.attendance-instructions li{display:flex;align-items:flex-start;gap:10px}
+.attendance-instructions li>span{display:grid;place-items:center;width:24px;height:24px;flex:none;border-radius:8px;background:#eef3ff;color:#3559b4;font-size:11px;font-weight:700}
+.attendance-instructions p{margin:2px 0 0;color:#536179;font-size:12px;line-height:1.5}
+.local-processing-note{padding-top:11px;margin-top:14px;border-top:1px solid #edf0f5}
+.attendance-privacy-note{margin:18px 0 0;color:#718096;font-size:11px;line-height:1.55}
+.nav-link.active .lucide{flex:none}
+.nav-link.active{background:#eef3ff;color:#274fc7;font-weight:600}
+.nav-link.active:hover{background:#e6edff}
+.sidebar .nav-link.active[href="/attendance"]{font-weight:600}
+@media(max-width:900px){.attendance-layout{grid-template-columns:minmax(0,1fr)}.attendance-side-column{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.attendance-notice{padding:13px}.attendance-notice p{font-size:12px}.attendance-layout{gap:13px;margin-top:13px}.attendance-camera-card,.attendance-status-card{padding:14px;border-radius:12px}.attendance-card-heading{align-items:flex-start;flex-wrap:wrap}.attendance-card-heading h2{font-size:18px}.attendance-state-pill{font-size:10px;padding:6px 8px}.camera-stage{aspect-ratio:4/3;min-height:210px}.camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.camera-controls .primary-button,.attendance-stop-button{padding:0 9px;font-size:12px}.attendance-side-column{grid-template-columns:1fr;gap:13px}}
 @media(max-width:1100px){.sidebar{width:235px}.main-area{margin-left:235px}.page-content{padding-inline:25px}.topbar{padding-inline:25px}.class-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.sidebar{width:270px}.main-area{margin-left:0}.topbar{height:60px;padding-inline:17px}.page-content{padding:24px 17px 15px}.page-heading h1{font-size:27px}.page-subtitle{font-size:14px}.stats-grid{gap:10px}.stat-card{min-height:132px;padding:15px}.stat-value{font-size:30px}.stat-label{font-size:13px}.class-grid{gap:11px}.class-card{padding:16px}.class-title-row h3{font-size:18px}.teacher-line b{font-size:13px}.class-metrics strong{font-size:18px}.class-metrics span{font-size:11px}.overview-counts{gap:20px}.student-table{min-width:690px}.table-pagination{gap:9px}.login-form-panel{padding:30px 24px}}
 @media(max-width:430px){.page-heading h1{font-size:25px}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stat-card{padding:13px;min-height:125px}.stat-value{font-size:28px}.stat-detail{font-size:11px}.class-grid{grid-template-columns:1fr}.class-card{padding:17px}.section-heading h2,.student-section-heading h2{font-size:21px}.class-count-label{font-size:11px}.overview-class h2{font-size:17px}.overview-class h2 span{font-size:12px}.overview-counts{justify-content:space-between;gap:10px}.overview-counts b{font-size:20px}.overview-counts span{font-size:11px}.search-box input{font-size:13px}.pagination-controls{gap:6px}.login-brand-panel{min-height:205px}}

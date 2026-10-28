@@ -42,7 +42,7 @@ const navigationGroups = [
   {
     label: "SCHOOL OPERATIONS",
     items: [
-      { label: "Attendance", icon: ClipboardList },
+      { label: "Attendance", icon: ClipboardList, to: "/attendance" },
       { label: "Fees & Payments", icon: Banknote },
       { label: "Parents", icon: Users },
       { label: "Announcements", icon: Megaphone },
