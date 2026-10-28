@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AxiosHeaders } from "axios";
-import { applyAuthResponse, applyCsrfHeader, clearCsrfToken, getCsrfToken, isUnsafeMethod, setCsrfToken } from "./csrfToken.js";
+import { applyAuthResponse, applyCsrfHeader, clearCsrfToken, getCsrfToken, isUnsafeMethod, refreshCsrfToken, setCsrfToken } from "./csrfToken.js";
 
 test("CSRF token is initialized and cleared only in module memory", () => {
   clearCsrfToken();
@@ -40,5 +40,21 @@ test("the current token is attached only to unsafe requests", () => {
   const safe = applyCsrfHeader({ method: "get", headers: new AxiosHeaders({ "x-csrf-token": "stale" }) });
   assert.equal(unsafe.headers.get("x-csrf-token"), "synthetic-csrf-token");
   assert.equal(safe.headers.has("x-csrf-token"), false);
+  clearCsrfToken();
+});
+
+test("CSRF recovery is single-flight and refreshes the token without replaying a mutation", async () => {
+  clearCsrfToken();
+  let refreshCalls = 0;
+  const refresh = async () => {
+    refreshCalls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return { user: { id: "synthetic-user" }, csrfToken: "recovered-token" };
+  };
+  const results = await Promise.all([refreshCsrfToken(refresh), refreshCsrfToken(refresh)]);
+  assert.deepEqual(results, [true, true]);
+  assert.equal(refreshCalls, 1);
+  assert.equal(getCsrfToken(), "recovered-token");
+  assert.equal(refreshCalls, 1);
   clearCsrfToken();
 });
