@@ -75,6 +75,15 @@ h1,h2,h3,.brand,.login-brand,.stat-value,.class-metrics strong,.overview-counts 
 .nav-link.active{background:#eef3ff;color:#274fc7;font-weight:600}
 .nav-link.active:hover{background:#e6edff}
 .sidebar .nav-link.active[href="/attendance"]{font-weight:600}
+.api-feedback{display:flex;align-items:center;gap:10px;min-height:60px;padding:15px;border:1px solid #dce3ee;border-radius:11px;background:#fff;color:#536179;font-size:13px;line-height:1.5}
+.api-feedback-error{align-items:flex-start;border-color:#f0d7dc;background:#fff8f9;color:#9b3d50}
+.api-feedback-error svg{flex:none;margin-top:1px}
+.api-feedback-error .text-button{margin:0 0 0 auto;white-space:nowrap}
+.api-feedback-spinner{flex:none;animation:spin 1s linear infinite;color:#4f76d3}
+.auth-check-state{min-height:100vh;display:grid;align-content:center;justify-items:center;gap:12px;padding:24px;background:#f6f8fc;text-align:center;color:#536179}
+.auth-check-state h1{margin:0;color:#172033;font:700 24px var(--heading-font)}
+.auth-check-state p{max-width:480px;margin:0 0 5px;font-size:14px;line-height:1.6}
+.auth-check-state a{color:#274fc7;font-size:13px}
 @media(max-width:900px){.attendance-layout{grid-template-columns:minmax(0,1fr)}.attendance-side-column{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.attendance-notice{padding:13px}.attendance-notice p{font-size:12px}.attendance-layout{gap:13px;margin-top:13px}.attendance-camera-card,.attendance-status-card{padding:14px;border-radius:12px}.attendance-card-heading{align-items:flex-start;flex-wrap:wrap}.attendance-card-heading h2{font-size:18px}.attendance-state-pill{font-size:10px;padding:6px 8px}.camera-stage{aspect-ratio:4/3;min-height:210px}.camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.camera-controls .primary-button,.attendance-stop-button{padding:0 9px;font-size:12px}.attendance-side-column{grid-template-columns:1fr;gap:13px}}
 @media(max-width:1100px){.sidebar{width:235px}.main-area{margin-left:235px}.page-content{padding-inline:25px}.topbar{padding-inline:25px}.class-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

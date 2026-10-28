@@ -1,51 +1,45 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import AppShell from "../../components/layout/AppShell.jsx";
 import StudentAvatar from "../../components/shared/StudentAvatar.jsx";
 import StudentProfileDialog from "./StudentProfileDialog.jsx";
-import { getClassById, getStudentsByClass } from "../../services/schoolService.js";
+import ApiFeedback from "../../components/shared/ApiFeedback.jsx";
+import { getApiErrorMessage } from "../../lib/api.js";
+import { getClassById, getClassStudents } from "../../services/schoolApi.js";
 import { formatClassLabel, getClassDisplayName, getSectionLabel } from "../../lib/classDisplay.js";
 export default function ClassDetailsPage() {
-  const { classId } = useParams(),
-    room = getClassById(classId),
-    allStudents = useMemo(
-      () => (room ? getStudentsByClass(classId) : []),
-      [classId, room],
-    );
+  const { classId } = useParams();
+  const classQuery = useQuery({ queryKey: ["classes", classId], queryFn: () => getClassById(classId), enabled: Boolean(classId) });
+  const room = classQuery.data;
   const [query, setQuery] = useState(""),
     [gender, setGender] = useState("All"),
     [pageSize, setPageSize] = useState(10),
-    [pageState, setPageState] = useState({ index: 0, filterKey: "" }),
+    [pageIndex, setPageIndex] = useState(0),
     [sort, setSort] = useState({ key: "rollNumber", direction: "asc" }),
     [selectedStudentId, setSelectedStudentId] = useState(null);
   const closeProfile = useCallback(() => setSelectedStudentId(null), []);
+  const normalized = query.trim();
+  const studentsQuery = useQuery({
+    queryKey: ["students", classId, normalized, gender, pageSize, sort.key, sort.direction, pageIndex],
+    queryFn: ({ signal }) => getClassStudents({ classId, search: normalized, gender, sortKey: sort.key, sortDirection: sort.direction, page: pageIndex + 1, limit: pageSize, signal }),
+    enabled: Boolean(classId) && classQuery.isSuccess,
+  });
+  const allStudents = studentsQuery.data?.students || [];
   const selectedStudent = allStudents.find((student) => student.id === selectedStudentId) || null;
-  const normalized = query.trim().toLowerCase(),
-    filterKey = `${normalized}|${gender}|${pageSize}|${sort.key}|${sort.direction}`,
-    page = pageState.filterKey === filterKey ? pageState.index : 0;
-  const filtered = useMemo(
-    () =>
-      allStudents
-        .filter(
-          (s) =>
-            (gender === "All" || s.gender === gender) &&
-            (!normalized ||
-              s.name.toLowerCase().includes(normalized) ||
-              s.admissionNumber.toLowerCase().includes(normalized) ||
-              String(s.rollNumber).includes(normalized)),
-        )
-        .sort((a, b) => {
-          const av = a[sort.key],
-            bv = b[sort.key],
-            c =
-              typeof av === "number"
-                ? av - bv
-                : String(av).localeCompare(String(bv));
-          return sort.direction === "asc" ? c : -c;
-        }),
-    [allStudents, gender, normalized, sort],
-  );
+  const totalStudents = studentsQuery.data?.pagination.total ?? 0;
+  const pages = studentsQuery.data?.pagination.pages ?? 0;
+  const safePage = Math.max(0, Math.min(pageIndex, Math.max(0, pages - 1)));
+  const visible = allStudents;
+  const setPage = (index) => setPageIndex(index);
+  const toggleSort = (key) => {
+    setSort((old) => ({ key, direction: old.key === key && old.direction === "asc" ? "desc" : "asc" }));
+    setPageIndex(0);
+  };
+  const arrow = (key) => sort.key === key ? (sort.direction === "asc" ? "↑" : "↓") : "↕";
+  if (classQuery.isLoading) return <AppShell title="Loading class" subtitle="Loading class details from the school server."><ApiFeedback loading /></AppShell>;
+  if (classQuery.isError && classQuery.error?.response?.status !== 404) return <AppShell title="Class unavailable" subtitle="The class could not be loaded."><ApiFeedback error={classQuery.error} onRetry={() => classQuery.refetch()} /></AppShell>;
   if (!room)
     return (
       <AppShell
@@ -66,17 +60,6 @@ export default function ClassDetailsPage() {
         </div>
       </AppShell>
     );
-  const pages = Math.ceil(filtered.length / pageSize),
-    safePage = Math.max(0, Math.min(page, Math.max(0, pages - 1))),
-    visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize),
-    setPage = (index) => setPageState({ index, filterKey }),
-    toggleSort = (key) =>
-      setSort((old) => ({
-        key,
-        direction: old.key === key && old.direction === "asc" ? "desc" : "asc",
-      })),
-    arrow = (key) =>
-      sort.key === key ? (sort.direction === "asc" ? "↑" : "↓") : "↕";
   return (
     <AppShell
       title={getClassDisplayName(room.name)}
@@ -132,7 +115,7 @@ export default function ClassDetailsPage() {
           <div>
             <p className="eyebrow">CLASS DIRECTORY</p>
             <h2>
-              Students <span className="count-badge">{allStudents.length}</span>
+              Students <span className="count-badge">{studentsQuery.isSuccess ? totalStudents : "…"}</span>
             </h2>
             <p>Search and explore your class roster.</p>
           </div>
@@ -144,10 +127,10 @@ export default function ClassDetailsPage() {
               aria-label="Search students"
               placeholder="Search by name, admission no. or roll no."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setPageIndex(0); }}
             />
             {query && (
-              <button aria-label="Clear search" onClick={() => setQuery("")}>
+              <button aria-label="Clear search" onClick={() => { setQuery(""); setPageIndex(0); }}>
                 <X size={15} />
               </button>
             )}
@@ -157,7 +140,7 @@ export default function ClassDetailsPage() {
             <select
               aria-label="Filter by gender"
               value={gender}
-              onChange={(e) => setGender(e.target.value)}
+              onChange={(e) => { setGender(e.target.value); setPageIndex(0); }}
             >
               <option value="All">All students</option>
               <option value="Male">Boys</option>
@@ -190,7 +173,9 @@ export default function ClassDetailsPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((s) => (
+              {studentsQuery.isLoading && <tr><td colSpan="5">Loading student records…</td></tr>}
+              {studentsQuery.isError && <tr><td colSpan="5"><div role="alert">{getApiErrorMessage(studentsQuery.error, "Student records could not be loaded.")} <button className="text-button" onClick={() => studentsQuery.refetch()}>Try again</button></div></td></tr>}
+              {studentsQuery.isSuccess && visible.map((s) => (
                 <tr key={s.id}>
                   <td>
                     <span className="roll-chip">
@@ -220,7 +205,7 @@ export default function ClassDetailsPage() {
               ))}
             </tbody>
           </table>
-          {visible.length === 0 && (
+          {studentsQuery.isSuccess && visible.length === 0 && (
             <div className="table-empty">
               <div className="empty-icon">
                 <Search size={20} />
@@ -237,6 +222,7 @@ export default function ClassDetailsPage() {
                   onClick={() => {
                     setQuery("");
                     setGender("All");
+                    setPageIndex(0);
                   }}
                 >
                   Clear filters
@@ -245,21 +231,21 @@ export default function ClassDetailsPage() {
             </div>
           )}
         </div>
-        <div className="table-pagination">
+        {studentsQuery.isSuccess && <div className="table-pagination">
           <span className="result-count">
             Showing{" "}
             <b>
-              {filtered.length ? safePage * pageSize + 1 : 0}–
-              {Math.min((safePage + 1) * pageSize, filtered.length)}
+              {totalStudents ? safePage * pageSize + 1 : 0}–
+              {Math.min((safePage + 1) * pageSize, totalStudents)}
             </b>{" "}
-            of <b>{filtered.length}</b> students
+            of <b>{totalStudents}</b> students
           </span>
           <div className="pagination-controls">
             <label>
               Rows per page{" "}
               <select
                 value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPageIndex(0); }}
               >
                 {[10, 20, 50].map((n) => (
                   <option key={n}>{n}</option>
@@ -286,7 +272,7 @@ export default function ClassDetailsPage() {
               <ChevronRight size={17} />
             </button>
           </div>
-        </div>
+        </div>}
       </section>
       {selectedStudent && <StudentProfileDialog student={selectedStudent} room={room} onClose={closeProfile} />}
     </AppShell>

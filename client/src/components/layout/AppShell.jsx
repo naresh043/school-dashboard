@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -20,8 +21,10 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { getCurrentUser, logoutDemo } from "../../services/schoolService.js";
 import { SCHOOL_NAME } from "../../data/branding.js";
+import { currentUserQueryKey, logoutStaff } from "../../features/auth/authApi.js";
+import { useCurrentUser } from "../../features/auth/useCurrentUser.js";
+import { getApiErrorMessage } from "../../lib/api.js";
 
 const navigationGroups = [
   {
@@ -62,14 +65,22 @@ const navigationGroups = [
 export default function AppShell({ children, title, subtitle }) {
   const [mobile, setMobile] = useState(false),
     [menu, setMenu] = useState(false),
+    [logoutError, setLogoutError] = useState(""),
     navigate = useNavigate(),
-    user = getCurrentUser(),
+    queryClient = useQueryClient(),
+    { data: user } = useCurrentUser(),
     greetingName = user?.name?.startsWith("S.")
       ? user.name.split(" ")[1]
       : user?.name?.split(" ")[0];
-  const logout = () => {
-    logoutDemo();
-    navigate("/login", { replace: true });
+  const logout = async () => {
+    setLogoutError("");
+    try {
+      await logoutStaff();
+      queryClient.setQueryData(currentUserQueryKey, null);
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setLogoutError(getApiErrorMessage(error, "Could not sign out. Try again."));
+    }
   };
   return (
     <div className="app-shell">
@@ -195,6 +206,7 @@ export default function AppShell({ children, title, subtitle }) {
                   <small>{SCHOOL_NAME}</small>
                   <small>{user?.email}</small>
                 </span>
+                {logoutError && <small role="alert">{logoutError}</small>}
                 <button onClick={logout}>
                   <LogOut size={15} /> Sign out
                 </button>

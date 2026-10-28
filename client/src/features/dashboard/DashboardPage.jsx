@@ -1,19 +1,25 @@
 import { BookOpen, ChevronRight, UserRound, Users } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import AppShell from "../../components/layout/AppShell.jsx";
 import StatCard from "../../components/shared/StatCard.jsx";
-import { getClasses, getDashboardStats } from "../../services/schoolService.js";
+import ApiFeedback from "../../components/shared/ApiFeedback.jsx";
+import { classesQueryKey, dashboardQueryKey, getClasses, getDashboardSummary } from "../../services/schoolApi.js";
 import { getClassDisplayName, getSectionLabel } from "../../lib/classDisplay.js";
 import { SCHOOL_NAME } from "../../data/branding.js";
 export default function DashboardPage({ directoryOnly = false }) {
-  const stats = getDashboardStats(),
-    classes = getClasses();
+  const summaryQuery = useQuery({ queryKey: dashboardQueryKey, queryFn: getDashboardSummary, enabled: !directoryOnly });
+  const classesQuery = useQuery({ queryKey: classesQueryKey, queryFn: getClasses });
+  const stats = summaryQuery.data;
+  const classes = classesQuery.data || [];
   return (
     <AppShell
       title={directoryOnly ? "Classes" : "Overview"}
       subtitle={directoryOnly ? "Browse classes and open a class roster." : "Here’s what’s happening across your school today."}
     >
-      {!directoryOnly && <section className="stats-grid" aria-label="School statistics">
+      {!directoryOnly && summaryQuery.isError && <ApiFeedback error={summaryQuery.error} onRetry={() => summaryQuery.refetch()} />}
+      {!directoryOnly && summaryQuery.isLoading && <ApiFeedback loading />}
+      {!directoryOnly && stats && <section className="stats-grid" aria-label="School statistics">
         <StatCard
           label="Total students"
           value={stats.totalStudents}
@@ -26,14 +32,14 @@ export default function DashboardPage({ directoryOnly = false }) {
           value={stats.totalBoys}
           icon={UserRound}
           tone="violet"
-          detail={`${Math.round((stats.totalBoys / stats.totalStudents) * 100)}% of students`}
+          detail={`${stats.totalStudents ? Math.round((stats.totalBoys / stats.totalStudents) * 100) : 0}% of students`}
         />
         <StatCard
           label="Girls"
           value={stats.totalGirls}
           icon={UserRound}
           tone="rose"
-          detail={`${Math.round((stats.totalGirls / stats.totalStudents) * 100)}% of students`}
+          detail={`${stats.totalStudents ? Math.round((stats.totalGirls / stats.totalStudents) * 100) : 0}% of students`}
         />
         <StatCard
           label="Total classes"
@@ -48,15 +54,17 @@ export default function DashboardPage({ directoryOnly = false }) {
           <div>
             <p className="eyebrow">{SCHOOL_NAME}</p>
             <h2>
-              Classes <span className="count-badge">{classes.length}</span>
+              Classes <span className="count-badge">{classesQuery.isLoading ? "…" : classes.length}</span>
             </h2>
             <p>Choose a class to view its students and details.</p>
           </div>
           <span className="class-count-label">
-            <span className="live-dot" /> {classes.length} active classes
+            {classesQuery.isLoading ? "Loading classes…" : <><span className="live-dot" /> {classes.length} active classes</>}
           </span>
         </div>
-        <div className="class-grid">
+        {classesQuery.isLoading || classesQuery.isError || classes.length === 0 ? (
+          <ApiFeedback loading={classesQuery.isLoading} error={classesQuery.error} onRetry={() => classesQuery.refetch()} emptyMessage={classesQuery.isSuccess ? "No active classes are available yet." : undefined} />
+        ) : <div className="class-grid">
           {classes.map((room, i) => (
             <Link
               className="class-card"
@@ -107,7 +115,7 @@ export default function DashboardPage({ directoryOnly = false }) {
               </div>
             </Link>
           ))}
-        </div>
+        </div>}
       </section>
     </AppShell>
   );
