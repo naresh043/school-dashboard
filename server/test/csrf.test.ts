@@ -11,10 +11,12 @@ Object.assign(process.env, {
   FACE_RECOGNITION_ENABLED: "false",
 });
 
-const [{ csrfProtection }, { csrfCookieName, cookieOptions }, { env }] = await Promise.all([
+const [{ csrfProtection }, { authCookieName, csrfCookieName, cookieOptions, csrfCookieOptions }, { env }, { createCorsOptions }, { logout }] = await Promise.all([
   import("../src/middleware/csrf.middleware.js"),
   import("../src/middleware/auth.middleware.js"),
   import("../src/config/env.js"),
+  import("../src/config/cors.js"),
+  import("../src/modules/auth/auth.controller.js"),
 ]);
 
 function invokeCsrf({ method = "POST", path = "/api/v1/attendance/sessions", origin = "https://school-demo.example", cookieToken, headerToken } = {}) {
@@ -71,4 +73,62 @@ test("unapproved origins are rejected and secure cross-site cookies use matching
   assert.equal(cookieOptions().secure, true);
   assert.equal(cookieOptions().sameSite, "none");
   assert.equal(cookieOptions().path, "/");
+  assert.equal(csrfCookieOptions(60000).httpOnly, true);
+  assert.equal(csrfCookieOptions(60000).maxAge, 60000);
+});
+
+test("CORS reflects only configured origins and enables credentials", async () => {
+  const options = createCorsOptions(env.CLIENT_ORIGIN);
+  assert.equal(options.credentials, true);
+  const allowed = await new Promise((resolve, reject) => options.origin("https://school-demo.example", (error, result) => error ? reject(error) : resolve(result)));
+  const denied = await new Promise((resolve, reject) => options.origin("https://unapproved.example", (error, result) => error ? reject(error) : resolve(result)));
+  assert.equal(allowed, true);
+  assert.equal(denied, false);
+});
+
+test("credentialed OPTIONS preflight is completed before CSRF validation", async () => {
+  const [{ default: express }, { default: cors }] = await Promise.all([import("express"), import("cors")]);
+  const app = express();
+  app.use(cors(createCorsOptions(env.CLIENT_ORIGIN)));
+  app.use(csrfProtection);
+  app.post("/unsafe", (_request, response) => response.json({ success: true }));
+  const server = app.listen(0, "127.0.0.1");
+  try {
+    await new Promise((resolve) => server.once("listening", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const response = await fetch(`http://127.0.0.1:${address.port}/unsafe`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://school-demo.example",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-csrf-token",
+      },
+    });
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get("access-control-allow-origin"), "https://school-demo.example");
+    assert.equal(response.headers.get("access-control-allow-credentials"), "true");
+    assert.match(response.headers.get("access-control-allow-headers") ?? "", /x-csrf-token/i);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve(undefined)));
+  }
+});
+
+test("logout clears both host-only cookies with the same path and security attributes", () => {
+  const cleared = [];
+  const response = {
+    clearCookie(name, options) { cleared.push({ name, options }); return this; },
+    status(statusCode) { this.statusCode = statusCode; return this; },
+    json(body) { this.body = body; return this; },
+  };
+  logout({} as never, response as never, (() => {}) as never);
+  assert.deepEqual(cleared.map((cookie) => cookie.name), [authCookieName, csrfCookieName]);
+  for (const { options } of cleared) {
+    assert.equal(options.secure, true);
+    assert.equal(options.sameSite, "none");
+    assert.equal(options.path, "/");
+  }
+  assert.equal(cleared[0].options.httpOnly, true);
+  assert.equal(cleared[1].options.httpOnly, true);
+  assert.deepEqual(response.body, { success: true, data: null, message: "Signed out successfully" });
 });
