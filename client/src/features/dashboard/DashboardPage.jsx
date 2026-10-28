@@ -4,6 +4,7 @@ import AppShell from "../../components/layout/AppShell.jsx";
 import StatCard from "../../components/shared/StatCard.jsx";
 import { getClasses, getDashboardStats } from "../../services/schoolService.js";
 import { getClassDisplayName, getSectionLabel } from "../../lib/classDisplay.js";
+import { SCHOOL_NAME } from "../../data/branding.js";
 export default function DashboardPage({ directoryOnly = false }) {
   const stats = getDashboardStats(),
     classes = getClasses();
@@ -45,7 +46,7 @@ export default function DashboardPage({ directoryOnly = false }) {
       <section className="classes-section" id="classes">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">YOUR SCHOOL</p>
+            <p className="eyebrow">{SCHOOL_NAME}</p>
             <h2>
               Classes <span className="count-badge">{classes.length}</span>
             </h2>

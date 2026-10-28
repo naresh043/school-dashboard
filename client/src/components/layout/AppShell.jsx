@@ -1,12 +1,72 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, ChevronDown, GraduationCap, LayoutDashboard, LogOut, Menu, X } from "lucide-react";
+import {
+  Activity,
+  Banknote,
+  BookOpen,
+  Bus,
+  CalendarDays,
+  ChartNoAxesCombined,
+  ChevronDown,
+  ClipboardList,
+  GraduationCap,
+  LayoutDashboard,
+  Library,
+  LogOut,
+  Menu,
+  Megaphone,
+  Settings,
+  Users,
+  UserRound,
+  X,
+} from "lucide-react";
 import { getCurrentUser, logoutDemo } from "../../services/schoolService.js";
+import { SCHOOL_NAME } from "../../data/branding.js";
+
+const navigationGroups = [
+  {
+    label: "OVERVIEW",
+    items: [{ label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" }],
+  },
+  {
+    label: "ACADEMIC MANAGEMENT",
+    items: [
+      { label: "Students", icon: Users },
+      { label: "Teachers", icon: UserRound },
+      { label: "Classes & Sections", icon: BookOpen, to: "/classes" },
+      { label: "Timetable", icon: CalendarDays },
+      { label: "Examinations", icon: ClipboardList },
+      { label: "Results & Grades", icon: Activity },
+    ],
+  },
+  {
+    label: "SCHOOL OPERATIONS",
+    items: [
+      { label: "Attendance", icon: ClipboardList },
+      { label: "Fees & Payments", icon: Banknote },
+      { label: "Parents", icon: Users },
+      { label: "Announcements", icon: Megaphone },
+      { label: "Library", icon: Library },
+      { label: "Transport", icon: Bus },
+    ],
+  },
+  {
+    label: "ADMINISTRATION",
+    items: [
+      { label: "Reports & Analytics", icon: ChartNoAxesCombined },
+      { label: "Settings", icon: Settings },
+    ],
+  },
+];
+
 export default function AppShell({ children, title, subtitle }) {
   const [mobile, setMobile] = useState(false),
     [menu, setMenu] = useState(false),
     navigate = useNavigate(),
-    user = getCurrentUser();
+    user = getCurrentUser(),
+    greetingName = user?.name?.startsWith("S.")
+      ? user.name.split(" ")[1]
+      : user?.name?.split(" ")[0];
   const logout = () => {
     logoutDemo();
     navigate("/login", { replace: true });
@@ -25,9 +85,7 @@ export default function AppShell({ children, title, subtitle }) {
           <span className="brand-mark">
             <GraduationCap size={22} />
           </span>
-          <span>
-            Northstar<span className="brand-muted"> Academy</span>
-          </span>
+          <span className="brand-name">{SCHOOL_NAME}</span>
           <button
             className="icon-button mobile-close"
             aria-label="Close menu"
@@ -36,22 +94,39 @@ export default function AppShell({ children, title, subtitle }) {
             <X size={19} />
           </button>
         </div>
-        <div className="school-switch">
-          <span className="school-avatar">N</span>
-          <span className="school-info">
-            <b>Northstar Academy</b>
-            <small>School administrator</small>
-          </span>
-          <ChevronDown size={15} />
-        </div>
-        <span className="nav-label">WORKSPACE</span>
         <nav className="side-nav">
-          <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} end to="/dashboard">
-            <LayoutDashboard size={18} /> Overview
-          </NavLink>
-          <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} to="/classes" onClick={() => setMobile(false)}>
-            <BookOpen size={18} /> Classes
-          </NavLink>
+          {navigationGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-label">{group.label}</span>
+              {group.items.map(({ label, icon: Icon, to }) =>
+                to ? (
+                  <NavLink
+                    key={label}
+                    className={({ isActive }) =>
+                      `nav-link ${isActive ? "active" : ""}`
+                    }
+                    end={to === "/dashboard"}
+                    to={to}
+                    onClick={() => setMobile(false)}
+                  >
+                    <Icon size={18} /> <span>{label}</span>
+                  </NavLink>
+                ) : (
+                  <button
+                    key={label}
+                    className="nav-link nav-placeholder"
+                    type="button"
+                    disabled
+                    title={`${label} — Coming soon`}
+                    aria-label={`${label}, coming soon`}
+                  >
+                    <Icon size={18} /> <span>{label}</span>
+                    <small>Coming soon</small>
+                  </button>
+                ),
+              )}
+            </div>
+          ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="help-card">
@@ -68,7 +143,7 @@ export default function AppShell({ children, title, subtitle }) {
             </div>
             <span className="user-label">
               <b>{user?.name || "School Admin"}</b>
-              <small>Administrator</small>
+              <small>{user?.role || "Administrator"}</small>
             </span>
             <button
               className="icon-button logout-button"
@@ -113,7 +188,13 @@ export default function AppShell({ children, title, subtitle }) {
             </button>
             {menu && (
               <div className="profile-menu">
-                <span>{user?.email}</span>
+                <span className="profile-details">
+                  <b>{user?.name}</b>
+                  <small>{user?.role}</small>
+                  <small>{user?.department}</small>
+                  <small>{SCHOOL_NAME}</small>
+                  <small>{user?.email}</small>
+                </span>
                 <button onClick={logout}>
                   <LogOut size={15} /> Sign out
                 </button>
@@ -127,7 +208,7 @@ export default function AppShell({ children, title, subtitle }) {
               <p className="eyebrow">MONDAY, OCTOBER 26, 2026</p>
               <h1>
                 {title === "Overview"
-                  ? `Good morning, ${user?.name.split(" ")[0] || "Admin"} 👋`
+                  ? `Good morning, ${greetingName || "Admin"} 👋`
                   : title}
               </h1>
               <p className="page-subtitle">{subtitle}</p>
@@ -140,14 +221,10 @@ export default function AppShell({ children, title, subtitle }) {
           </div>
           {children}
           <footer className="footer">
-            © 2026 Northstar Academy <span>•</span> Built for better school days
+            © 2026 {SCHOOL_NAME} <span>•</span> Built for better school days
           </footer>
         </div>
       </main>
     </div>
   );
 }
-
-
-
-
