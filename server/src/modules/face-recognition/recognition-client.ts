@@ -3,11 +3,12 @@ import { ApiError } from "../../utils/ApiError.js";
 import { isValidEmbedding } from "./template-crypto.js";
 
 export type RecognitionResult = { status: "ready"; embedding: number[]; modelId: string; modelVersion: string };
-export type RecognitionReadinessReason = "configuration_missing" | "service_unavailable" | "service_auth_failed" | "model_not_ready" | "provider_protocol_error" | null;
+export type RecognitionReadinessReason = "recognition_disabled" | "configuration_missing" | "service_unavailable" | "service_auth_failed" | "model_not_ready" | "provider_protocol_error" | null;
 export type RecognitionReadiness = { ready: boolean; modelConfigured: boolean; reason: RecognitionReadinessReason };
 
 export function isRecognitionConfigured(configuration: Environment = env) {
   return Boolean(
+    configuration.FACE_RECOGNITION_ENABLED &&
     configuration.RECOGNITION_SERVICE_URL &&
     configuration.RECOGNITION_SERVICE_SECRET &&
     configuration.RECOGNITION_MODEL_ID && configuration.RECOGNITION_MODEL_ID !== "unconfigured" &&
@@ -16,7 +17,14 @@ export function isRecognitionConfigured(configuration: Environment = env) {
   );
 }
 
+export function requireRecognitionEnabled(configuration: Environment = env) {
+  if (!configuration.FACE_RECOGNITION_ENABLED) {
+    throw new ApiError(503, "FACE_RECOGNITION_DISABLED", "Face recognition is disabled for this deployment");
+  }
+}
+
 export async function recognitionHealth(configuration: Environment = env): Promise<RecognitionReadiness> {
+  if (!configuration.FACE_RECOGNITION_ENABLED) return { ready: false, modelConfigured: false, reason: "recognition_disabled" };
   if (!isRecognitionConfigured(configuration)) return { ready: false, modelConfigured: false, reason: "configuration_missing" };
   try {
     const response = await fetch(new URL("/v1/health", configuration.RECOGNITION_SERVICE_URL!), { headers: { authorization: `Bearer ${configuration.RECOGNITION_SERVICE_SECRET!}` }, signal: AbortSignal.timeout(1500) });
@@ -35,14 +43,15 @@ export async function recognitionHealth(configuration: Environment = env): Promi
   }
 }
 
-export async function createEmbedding(image: { mimeType: string; data: string }): Promise<RecognitionResult> {
-  if (!isRecognitionConfigured()) {
+export async function createEmbedding(image: { mimeType: string; data: string }, configuration: Environment = env): Promise<RecognitionResult> {
+  requireRecognitionEnabled(configuration);
+  if (!isRecognitionConfigured(configuration)) {
     throw new ApiError(503, "RECOGNITION_NOT_CONFIGURED", "Face recognition is unavailable until a licensed model is configured");
   }
   let response: Response;
   try {
-    response = await fetch(new URL("/v1/embedding", env.RECOGNITION_SERVICE_URL), {
-      method: "POST", headers: { authorization: `Bearer ${env.RECOGNITION_SERVICE_SECRET}`, "content-type": "application/json" },
+    response = await fetch(new URL("/v1/embedding", configuration.RECOGNITION_SERVICE_URL!), {
+      method: "POST", headers: { authorization: `Bearer ${configuration.RECOGNITION_SERVICE_SECRET!}`, "content-type": "application/json" },
       body: JSON.stringify(image), signal: AbortSignal.timeout(5000),
     });
   } catch {
@@ -55,7 +64,7 @@ export async function createEmbedding(image: { mimeType: string; data: string })
   const result: unknown = await response.json().catch(() => null);
   if (typeof result !== "object" || result === null || !("embedding" in result) || !("modelId" in result) || !("modelVersion" in result)) throw new ApiError(502, "INVALID_RECOGNITION_RESPONSE", "Recognition service returned an invalid result");
   const output = result as { embedding: unknown; modelId: unknown; modelVersion: unknown };
-  if (!isValidEmbedding(output.embedding) || output.modelId !== env.RECOGNITION_MODEL_ID || output.modelVersion !== env.RECOGNITION_MODEL_VERSION) throw new ApiError(502, "INVALID_RECOGNITION_RESPONSE", "Recognition service returned an invalid result");
+  if (!isValidEmbedding(output.embedding) || output.modelId !== configuration.RECOGNITION_MODEL_ID || output.modelVersion !== configuration.RECOGNITION_MODEL_VERSION) throw new ApiError(502, "INVALID_RECOGNITION_RESPONSE", "Recognition service returned an invalid result");
   const norm = Math.sqrt(output.embedding.reduce((sum, value) => sum + value * value, 0));
   if (Math.abs(norm - 1) > 0.02) throw new ApiError(502, "INVALID_RECOGNITION_RESPONSE", "Recognition service returned an invalid result");
   return { status: "ready", embedding: output.embedding, modelId: String(output.modelId), modelVersion: String(output.modelVersion) };

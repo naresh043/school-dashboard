@@ -1,11 +1,11 @@
 import { Types } from "mongoose";
-import { env } from "../../config/env.js";
+import { env, type Environment } from "../../config/env.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { Student } from "../students/student.model.js";
 import { SchoolClass } from "../classes/class.model.js";
 import { FaceAuditEvent } from "./face-audit.model.js";
 import { FaceEnrollment } from "./face-enrollment.model.js";
-import { createEmbedding, recognitionHealth, type RecognitionResult } from "./recognition-client.js";
+import { createEmbedding, recognitionHealth, requireRecognitionEnabled, type RecognitionResult } from "./recognition-client.js";
 import { classifyCandidates, cosineSimilarity, decryptTemplate, encryptTemplate } from "./template-crypto.js";
 
 async function authorizedStudent(studentId: string) {
@@ -15,13 +15,15 @@ async function authorizedStudent(studentId: string) {
   return student;
 }
 
-export async function setFaceAuthorization(studentId: string, reference: string, actorId: string) {
+export async function setFaceAuthorization(studentId: string, reference: string, actorId: string, configuration: Environment = env) {
+  requireRecognitionEnabled(configuration);
   const student = await Student.findOneAndUpdate({ _id: studentId, isActive: true }, { $set: { "faceAuthorization.status": "authorized", "faceAuthorization.reference": reference, "faceAuthorization.authorizedBy": new Types.ObjectId(actorId), "faceAuthorization.authorizedAt": new Date() }, $unset: { "faceAuthorization.revokedAt": 1 } }, { new: true }).select("_id").lean();
   if (!student) throw new ApiError(404, "STUDENT_NOT_FOUND", "Active student was not found");
   return { authorizationRecorded: true };
 }
 
-export async function getEnrollmentStatus(studentId: string) {
+export async function getEnrollmentStatus(studentId: string, configuration: Environment = env) {
+  requireRecognitionEnabled(configuration);
   const [student, enrollment] = await Promise.all([
     Student.findOne({ _id: studentId, isActive: true }).select("faceAuthorization.status").lean(),
     FaceEnrollment.findOne({ studentId }).select("modelId modelVersion enrolledAt updatedAt").lean(),
@@ -30,15 +32,16 @@ export async function getEnrollmentStatus(studentId: string) {
   return { authorizationStatus: student.faceAuthorization?.status ?? "not-authorized", enrollment: enrollment ? { status: "active", enrolledAt: enrollment.enrolledAt, updatedAt: enrollment.updatedAt, modelId: enrollment.modelId, modelVersion: enrollment.modelVersion } : null };
 }
 
-export async function enrollStudent(studentId: string, image: { mimeType: string; data: string }, actorId: string) {
+export async function enrollStudent(studentId: string, image: { mimeType: string; data: string }, actorId: string, configuration: Environment = env) {
+  requireRecognitionEnabled(configuration);
   const student = await authorizedStudent(studentId);
-  const health = await recognitionHealth();
+  const health = await recognitionHealth(configuration);
   if (!health.ready) {
     if (health.reason === "service_auth_failed") throw new ApiError(502, "RECOGNITION_SERVICE_AUTH_FAILED", "Recognition service authentication failed");
     if (health.reason === "provider_protocol_error") throw new ApiError(502, "RECOGNITION_PROVIDER_PROTOCOL_ERROR", "Recognition service returned an unexpected response");
     throw new ApiError(503, "RECOGNITION_SERVICE_UNAVAILABLE", "Enrollment is unavailable because the recognition model is not ready");
   }
-  const result = await createEmbedding(image);
+  const result = await createEmbedding(image, configuration);
   const existing = await FaceEnrollment.findOne({ studentId }).select("_id").lean();
   const encrypted = encryptTemplate(result.embedding);
   await FaceEnrollment.findOneAndUpdate({ studentId }, {
@@ -49,7 +52,8 @@ export async function enrollStudent(studentId: string, image: { mimeType: string
   return { status: existing ? "replaced" : "enrolled" };
 }
 
-export async function revokeEnrollment(studentId: string, actorId: string) {
+export async function revokeEnrollment(studentId: string, actorId: string, configuration: Environment = env) {
+  requireRecognitionEnabled(configuration);
   const student = await Student.findOneAndUpdate({ _id: studentId }, { $set: { "faceAuthorization.status": "revoked", "faceAuthorization.revokedAt": new Date() } }, { new: true }).select("_id").lean();
   if (!student) throw new ApiError(404, "STUDENT_NOT_FOUND", "Student was not found");
   const removed = await FaceEnrollment.findOneAndDelete({ studentId }).select("_id").lean();
@@ -57,11 +61,12 @@ export async function revokeEnrollment(studentId: string, actorId: string) {
   return { revoked: true, enrollmentRemoved: Boolean(removed) };
 }
 
-export async function identifyStudent(classId: string, image: { mimeType: string; data: string }, actorId: string) {
+export async function identifyStudent(classId: string, image: { mimeType: string; data: string }, actorId: string, configuration: Environment = env) {
+  requireRecognitionEnabled(configuration);
   const auditBase = { action: "recognition" as const, actorId: new Types.ObjectId(actorId), classId: new Types.ObjectId(classId) };
   const schoolClass = await SchoolClass.findOne({ _id: classId, isActive: true }).select("_id").lean();
   if (!schoolClass) throw new ApiError(404, "CLASS_NOT_FOUND", "Active class was not found");
-  const health = await recognitionHealth();
+  const health = await recognitionHealth(configuration);
   if (!health.ready) {
     if (health.reason === "service_auth_failed" || health.reason === "provider_protocol_error") {
       await FaceAuditEvent.create({ ...auditBase, outcome: "failed" });
@@ -73,7 +78,7 @@ export async function identifyStudent(classId: string, image: { mimeType: string
   }
   let output: RecognitionResult;
   try {
-    output = await createEmbedding(image);
+    output = await createEmbedding(image, configuration);
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 503) {
       await FaceAuditEvent.create({ ...auditBase, outcome: "service_unavailable" });
@@ -94,7 +99,7 @@ export async function identifyStudent(classId: string, image: { mimeType: string
   return { outcome: "match" as const, student: { id: String(student._id), studentCode: student.studentCode, name: student.displayName || `${student.firstName} ${student.lastName}`.trim() } };
 }
 
-export async function faceRecognitionHealth() {
-  const result = await recognitionHealth();
+export async function faceRecognitionHealth(configuration: Environment = env) {
+  const result = await recognitionHealth(configuration);
   return { status: result.ready ? "ready" : "unavailable", modelConfigured: result.modelConfigured, reason: result.reason };
 }

@@ -5,19 +5,9 @@ Node.js 20.19+ is required; the repository was developed with Node 22.21.0. The 
 ## Local setup (Windows / PowerShell)
 
 1. Install MongoDB Community locally and start the MongoDB service, or provision a development database with a trusted MongoDB provider. The example URI uses local MongoDB only.
-2. If `server/.env` does not exist, copy `server/.env.example` to `server/.env`. If it already exists, preserve its existing settings and set only `RECOGNITION_SERVICE_URL=http://127.0.0.1:8001` for the local recognition adapter. Do not commit `.env`.
-3. Replace the example `JWT_SECRET` with a generated secret; the application rejects the placeholder. Set `RECOGNITION_SERVICE_SECRET` to a separate generated value (at least 32 characters), and provide that same value to the Python process environment without printing it. Keep the example model ID/version at `unconfigured` until an authorized model is integrated; readiness stays unavailable until model ID/version and a valid `FACE_TEMPLATE_KEY` are configured.
-4. In a separate PowerShell terminal, activate the recognition service virtual environment, provide the same `RECOGNITION_SERVICE_SECRET` used by Node through your local secret manager/environment, then start the service on loopback:
-
-   ```powershell
-   cd recognition-service
-   .\.venv\Scripts\Activate.ps1
-   python -m uvicorn app:app --reload --host 127.0.0.1 --port 8001
-   ```
-
-   The Python process reads the secret from its own environment; it does not load `server/.env`. Do not print or commit the secret. The service is loopback-bound and must not be exposed publicly.
-
-5. Install and start the API:
+2. If `server/.env` does not exist, copy `server/.env.example` to `server/.env`. Do not overwrite existing settings or commit `.env`.
+3. Replace the example `JWT_SECRET` with a generated secret; the application rejects the placeholder. Set `FACE_RECOGNITION_ENABLED=false` for the client demo. No Python recognition service, recognition secret, model ID/version, template key, or threshold is needed in this mode.
+4. Install and start the API:
 
    ```powershell
    cd server
@@ -25,7 +15,7 @@ Node.js 20.19+ is required; the repository was developed with Node 22.21.0. The 
    npm run dev
    ```
 
-6. In a second terminal, install and start the frontend:
+5. In a second terminal, install and start the frontend:
 
    ```powershell
    cd client
@@ -72,10 +62,23 @@ Available API groups are `/api/v1/auth`, `/students`, `/classes`, `/teachers`, `
 
 Phase 3 adds `PUT /api/v1/students/:studentId/face-authorization`, `GET /api/v1/students/:studentId/face-enrollment`, `POST /api/v1/students/:studentId/face-enrollments`, `DELETE /api/v1/students/:studentId/face-enrollment`, `POST /api/v1/face-recognition/identify`, and authenticated `GET /api/v1/face-recognition/health`. All require the current HOD role, strict payload schemas, and image request rate limits. An authorization reference is an opaque pointer to a separately approved record; the app does not establish consent. `face-enrollments` is a separate collection. Embeddings are AES-256-GCM encrypted with a server-only 32-byte key. Revocation disables authorization and deletes the current template; backups may retain deleted data until their configured expiry.
 
-The private recognition adapter is in `recognition-service/` and listens on `127.0.0.1:8001` for local development. Node connects using `RECOGNITION_SERVICE_URL`; the checked-in example uses `http://127.0.0.1:8001`. With a valid shared internal token, `GET /v1/health` returns HTTP 200 with `ready:false`; `POST /v1/embedding` returns HTTP 503 for a valid image, HTTP 400 for invalid image data, and HTTP 401 for missing/invalid internal authentication. `/docs`, `/openapi.json`, and `/` are intentionally not registered. The adapter remains unavailable until a properly licensed model is integrated; it never returns embeddings, identities, or attendance results. See its README for privacy, evaluation, spoofing limitations, and setup. Production requires an authorized model, internal HTTPS service URL and secret, model ID/version, encrypted-template key, and an explicitly supplied evaluation-derived threshold. The service must remain private and network-restricted; the browser must never call it directly.
+## Recognition availability
+
+The client-demo configuration sets `FACE_RECOGNITION_ENABLED=false` (the default). The Python recognition service is not required or called. Authenticated `GET /api/v1/face-recognition/health` reports `status: "unavailable"`, `modelConfigured: false`, and `reason: "recognition_disabled"`. Other face-recognition endpoints return a safe HTTP 503 `FACE_RECOGNITION_DISABLED` response after their existing authentication, authorization, rate-limit, and request-validation checks. They do not read or change face templates. Browser face detection may run locally, but the UI states that a detected face is not verified identity. Recognition never writes attendance; manual attendance remains a separate API path.
+
+The recognition architecture remains available for a future approved provider. To opt in later, set `FACE_RECOGNITION_ENABLED=true` and provide `RECOGNITION_SERVICE_URL` (HTTPS in production), `RECOGNITION_SERVICE_SECRET` (at least 32 characters), licensed `RECOGNITION_MODEL_ID` and `RECOGNITION_MODEL_VERSION`, `FACE_TEMPLATE_KEY` (base64-encoded 32-byte AES key), and an explicitly evaluated `FACE_MATCH_THRESHOLD`. The provider must implement the existing private Python HTTP contract, and the model/weight/data rights, privacy review, and accuracy evaluation must be approved first. Keep the provider private and do not call it from the browser. No model is integrated or activated by this demo configuration.
 
 ## Deployment
 
-Deploy the API as a persistent Node.js service separately from the Vite static frontend. Configure `MONGODB_URI`, a unique `JWT_SECRET`, `CLIENT_ORIGIN` (comma-separated exact origins), `COOKIE_SECURE=true`, and `NODE_ENV=production` in the backend environment. If enabling Phase 3, production validation additionally requires `RECOGNITION_SERVICE_URL` (HTTPS), `RECOGNITION_SERVICE_SECRET`, licensed `RECOGNITION_MODEL_ID` and `RECOGNITION_MODEL_VERSION`, `FACE_TEMPLATE_KEY` (base64-encoded 32-byte key), and an explicitly evaluated `FACE_MATCH_THRESHOLD`. Keep the Python service private and allow network access only from the Node API. Use HTTPS for frontend, API, and internal service communication; if frontend and API are on different sites, set `COOKIE_SAME_SITE=none` (which requires secure cookies). Set the frontend's `VITE_API_BASE_URL` to the public API `/api/v1` URL and rebuild the frontend. Never publish `.env` or put backend secrets in frontend build variables.
+Deploy the API as a persistent Node.js service separately from the Vite static frontend. For the demo, set these backend environment variables in Render:
+
+- `NODE_ENV=production`
+- `MONGODB_URI` to the deployed MongoDB connection URI
+- `JWT_SECRET` to a generated secret (at least 32 characters; not the example placeholder)
+- `CLIENT_ORIGIN` to the exact HTTPS frontend origin
+- `COOKIE_SECURE=true`
+- `FACE_RECOGNITION_ENABLED=false`
+
+Render supplies `PORT`; the API listens on `0.0.0.0`. `COOKIE_SAME_SITE` is optional (default browser same-site policy); if frontend and API are on different sites, set it to `none`, which requires secure cookies. Set the frontend build variable `VITE_API_BASE_URL` to `https://<backend-host>/api/v1`, then rebuild the frontend. This is public URL configuration, not a secret. Do not set backend credentials as `VITE_` variables or publish `.env` files. No Python service or recognition-only variables are required for the demo. If recognition is deliberately enabled in a future approved deployment, supply all provider variables described above and keep the service private.
 
 MongoDB transactions are not required for the implemented single-document attendance upsert; unique indexes enforce one session per class/day and one attendance record per student/session. Install/configure MongoDB before expecting database-backed screens or authentication to work.

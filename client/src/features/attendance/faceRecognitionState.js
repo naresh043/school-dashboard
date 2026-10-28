@@ -6,6 +6,9 @@ export function getRecognitionUnavailableMessage(health, failed = false) {
   if (isRecognitionReady(health)) return "";
   if (failed) return "The recognition service status could not be reached. Enrollment and identity recognition are disabled.";
   if (!health) return "Checking recognition service status…";
+  if (health.reason === "recognition_disabled") {
+    return "Student identification is disabled for this demo. Face detection works locally, but a detected face is not a verified student identity.";
+  }
   if (health.reason === "model_not_ready" || health.reason === "configuration_missing") {
     return "The development recognition provider is active, but no licensed identity model is configured. Enrollment and identity recognition are disabled; local face detection still works.";
   }

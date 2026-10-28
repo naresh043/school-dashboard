@@ -58,6 +58,10 @@ const environmentSchema = z
 
     SEED_HOD_PASSWORD: z.string().min(12).optional(),
 
+    FACE_RECOGNITION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     RECOGNITION_SERVICE_URL: z.string().url().optional(),
     RECOGNITION_SERVICE_SECRET: z.string().min(32).optional(),
     RECOGNITION_MODEL_ID: z.string().trim().min(1).optional(),
@@ -85,7 +89,7 @@ const environmentSchema = z
       });
     }
 
-    if (value.NODE_ENV === "production") {
+    if (value.NODE_ENV === "production" && value.FACE_RECOGNITION_ENABLED) {
       for (const key of ["RECOGNITION_SERVICE_URL", "RECOGNITION_SERVICE_SECRET", "RECOGNITION_MODEL_ID", "RECOGNITION_MODEL_VERSION", "FACE_TEMPLATE_KEY"] as const) {
         if (!value[key]) context.addIssue({ code: "custom", path: [key], message: "is required in production before face recognition can be enabled" });
       }
@@ -101,10 +105,10 @@ const environmentSchema = z
         context.addIssue({ code: "custom", path: ["RECOGNITION_SERVICE_URL"], message: "must use HTTPS in production" });
       }
     }
-    if (value.RECOGNITION_SERVICE_SECRET && value.RECOGNITION_SERVICE_SECRET.length < 32) {
+    if (value.FACE_RECOGNITION_ENABLED && value.RECOGNITION_SERVICE_SECRET && value.RECOGNITION_SERVICE_SECRET.length < 32) {
       context.addIssue({ code: "custom", path: ["RECOGNITION_SERVICE_SECRET"], message: "must be at least 32 characters" });
     }
-    if (value.FACE_TEMPLATE_KEY) {
+    if (value.FACE_RECOGNITION_ENABLED && value.FACE_TEMPLATE_KEY) {
       try {
         if (!/^[A-Za-z0-9+/]{43}=$/.test(value.FACE_TEMPLATE_KEY) || Buffer.from(value.FACE_TEMPLATE_KEY, "base64").length !== 32) throw new Error();
       } catch {
@@ -131,7 +135,17 @@ export type Environment = z.infer<typeof environmentSchema>;
 export function parseEnvironment(
   input: NodeJS.ProcessEnv,
 ): Environment {
-  const parsed = environmentSchema.safeParse(input);
+  const recognitionEnabled = input.FACE_RECOGNITION_ENABLED === "true";
+  const schemaInput = recognitionEnabled ? input : {
+    ...input,
+    RECOGNITION_SERVICE_URL: undefined,
+    RECOGNITION_SERVICE_SECRET: undefined,
+    RECOGNITION_MODEL_ID: undefined,
+    RECOGNITION_MODEL_VERSION: undefined,
+    FACE_TEMPLATE_KEY: undefined,
+    FACE_MATCH_THRESHOLD: undefined,
+  };
+  const parsed = environmentSchema.safeParse(schemaInput);
 
   if (!parsed.success) {
     const details = parsed.error.issues
@@ -144,7 +158,7 @@ export function parseEnvironment(
     throw new Error(`Invalid server environment: ${details}`);
   }
 
-  if (parsed.data.NODE_ENV === "production" && input.FACE_MATCH_THRESHOLD === undefined) {
+  if (parsed.data.NODE_ENV === "production" && parsed.data.FACE_RECOGNITION_ENABLED && input.FACE_MATCH_THRESHOLD === undefined) {
     throw new Error("Invalid server environment: FACE_MATCH_THRESHOLD must be explicitly set from an authorized evaluation before production use");
   }
 

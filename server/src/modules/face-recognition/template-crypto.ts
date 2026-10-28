@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { ApiError } from "../../utils/ApiError.js";
 
 function key() {
+  if (!env.FACE_RECOGNITION_ENABLED) throw new ApiError(503, "FACE_RECOGNITION_DISABLED", "Face recognition is disabled for this deployment");
   if (!env.FACE_TEMPLATE_KEY) throw new ApiError(503, "TEMPLATE_ENCRYPTION_UNAVAILABLE", "Face enrollment is not configured");
   const decoded = Buffer.from(env.FACE_TEMPLATE_KEY, "base64");
   if (decoded.length !== 32) throw new ApiError(503, "TEMPLATE_ENCRYPTION_UNAVAILABLE", "Face enrollment is not configured");

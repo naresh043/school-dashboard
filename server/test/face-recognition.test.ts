@@ -8,6 +8,7 @@ Object.assign(process.env, {
   CLIENT_ORIGIN: "http://localhost:5173",
   JWT_SECRET: "test-only-secret-that-is-never-used-for-a-session",
   COOKIE_SECURE: "false",
+  FACE_RECOGNITION_ENABLED: "true",
   RECOGNITION_SERVICE_URL: "http://recognition.test",
   RECOGNITION_SERVICE_SECRET: "test-only-private-recognition-service-secret",
   RECOGNITION_MODEL_ID: "test-model",
@@ -24,7 +25,7 @@ const [{ classifyCandidates, cosineSimilarity, decryptTemplate, encryptTemplate,
   import("../src/config/env.js"),
 ]);
 
-const [{ enrollStudent, identifyStudent }, { Student }, { SchoolClass }, { FaceEnrollment }, { FaceAuditEvent }, { AttendanceRecordModel }, { AttendanceSession }, { setManualAttendance }] = await Promise.all([
+const [{ enrollStudent, identifyStudent, setFaceAuthorization, getEnrollmentStatus, revokeEnrollment, faceRecognitionHealth }, { Student }, { SchoolClass }, { FaceEnrollment }, { FaceAuditEvent }, { AttendanceRecordModel }, { AttendanceSession }, { setManualAttendance }] = await Promise.all([
   import("../src/modules/face-recognition/face-recognition.service.js"),
   import("../src/modules/students/student.model.js"),
   import("../src/modules/classes/class.model.js"),
@@ -85,6 +86,59 @@ test("readiness requires URL, internal auth, model ID/version, and template encr
   assert.equal(isRecognitionConfigured({ ...env, RECOGNITION_MODEL_VERSION: undefined }), false);
   assert.equal(isRecognitionConfigured({ ...env, FACE_TEMPLATE_KEY: undefined }), false);
   assert.equal(isRecognitionConfigured({ ...env, RECOGNITION_SERVICE_SECRET: undefined }), false);
+});
+
+test("disabled recognition reports unavailable and makes no provider or biometric database calls", async () => {
+  const disabled = { ...env, FACE_RECOGNITION_ENABLED: false };
+  const originals = {
+    studentFindOne: Student.findOne,
+    studentFindOneAndUpdate: Student.findOneAndUpdate,
+    classFindOne: SchoolClass.findOne,
+    enrollmentFindOne: FaceEnrollment.findOne,
+    enrollmentFindOneAndUpdate: FaceEnrollment.findOneAndUpdate,
+    enrollmentFindOneAndDelete: FaceEnrollment.findOneAndDelete,
+    auditCreate: FaceAuditEvent.create,
+    attendanceCreate: AttendanceRecordModel.create,
+    attendanceFindOneAndUpdate: AttendanceRecordModel.findOneAndUpdate,
+    fetch: globalThis.fetch,
+  };
+  let databaseCalls = 0;
+  let providerCalls = 0;
+  const touched = () => { databaseCalls += 1; return { select() { return this; }, lean: async () => null }; };
+  Student.findOne = touched as typeof Student.findOne;
+  Student.findOneAndUpdate = touched as typeof Student.findOneAndUpdate;
+  SchoolClass.findOne = touched as typeof SchoolClass.findOne;
+  FaceEnrollment.findOne = touched as typeof FaceEnrollment.findOne;
+  FaceEnrollment.findOneAndUpdate = touched as typeof FaceEnrollment.findOneAndUpdate;
+  FaceEnrollment.findOneAndDelete = touched as typeof FaceEnrollment.findOneAndDelete;
+  FaceAuditEvent.create = touched as typeof FaceAuditEvent.create;
+  AttendanceRecordModel.create = touched as typeof AttendanceRecordModel.create;
+  AttendanceRecordModel.findOneAndUpdate = touched as typeof AttendanceRecordModel.findOneAndUpdate;
+  globalThis.fetch = (async () => { providerCalls += 1; throw new Error("disabled provider must not be called"); }) as typeof fetch;
+  const disabledError = { code: "FACE_RECOGNITION_DISABLED", statusCode: 503 };
+  try {
+    assert.deepEqual(await recognitionHealth(disabled), { ready: false, modelConfigured: false, reason: "recognition_disabled" });
+    assert.deepEqual(await faceRecognitionHealth(disabled), { status: "unavailable", modelConfigured: false, reason: "recognition_disabled" });
+    await assert.rejects(() => createEmbedding({ mimeType: "image/jpeg", data: "synthetic" }, disabled), disabledError);
+    await assert.rejects(() => setFaceAuthorization("507f1f77bcf86cd799439011", "reference-1", "507f1f77bcf86cd799439013", disabled), disabledError);
+    await assert.rejects(() => getEnrollmentStatus("507f1f77bcf86cd799439011", disabled), disabledError);
+    await assert.rejects(() => enrollStudent("507f1f77bcf86cd799439011", { mimeType: "image/jpeg", data: "synthetic" }, "507f1f77bcf86cd799439013", disabled), disabledError);
+    await assert.rejects(() => revokeEnrollment("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439013", disabled), disabledError);
+    await assert.rejects(() => identifyStudent("507f1f77bcf86cd799439012", { mimeType: "image/jpeg", data: "synthetic" }, "507f1f77bcf86cd799439013", disabled), disabledError);
+    assert.equal(databaseCalls, 0);
+    assert.equal(providerCalls, 0);
+  } finally {
+    Student.findOne = originals.studentFindOne;
+    Student.findOneAndUpdate = originals.studentFindOneAndUpdate;
+    SchoolClass.findOne = originals.classFindOne;
+    FaceEnrollment.findOne = originals.enrollmentFindOne;
+    FaceEnrollment.findOneAndUpdate = originals.enrollmentFindOneAndUpdate;
+    FaceEnrollment.findOneAndDelete = originals.enrollmentFindOneAndDelete;
+    FaceAuditEvent.create = originals.auditCreate;
+    AttendanceRecordModel.create = originals.attendanceCreate;
+    AttendanceRecordModel.findOneAndUpdate = originals.attendanceFindOneAndUpdate;
+    globalThis.fetch = originals.fetch;
+  }
 });
 
 test("health distinguishes missing config, an unready mock, auth failure, and outage", async () => {
