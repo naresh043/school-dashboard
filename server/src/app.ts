@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import { databaseIsReady } from "./config/db.js";
+import { createCorsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { csrfProtection } from "./middleware/csrf.middleware.js";
@@ -22,16 +23,7 @@ export const getHealthPayload = () => databaseIsReady()
   : { status: 503, body: { success: false, error: { code: "DATABASE_UNAVAILABLE", message: "Database connection is unavailable" } } };
 app.disable("x-powered-by");
 app.use(helmet());
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || env.CLIENT_ORIGIN.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(null, false);
-  },
-  credentials: true,
-}));
+app.use(cors(createCorsOptions(env.CLIENT_ORIGIN)));
 app.use(express.json({ limit: "4mb" }));
 app.use(cookieParser());
 app.use(csrfProtection);

@@ -15,6 +15,14 @@ export function cookieOptions() {
   } as const;
 }
 
+export function csrfCookieOptions(maxAge?: number) {
+  return {
+    ...cookieOptions(),
+    httpOnly: true,
+    ...(maxAge === undefined ? {} : { maxAge }),
+  } as const;
+}
+
 export const requireAuth: RequestHandler = async (request, _response, next) => {
   try {
     const token = request.cookies?.[authCookieName] as string | undefined;
