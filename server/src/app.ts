@@ -9,6 +9,7 @@ import { csrfProtection } from "./middleware/csrf.middleware.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { notFoundHandler } from "./middleware/not-found.middleware.js";
 import attendanceRoutes from "./modules/attendance/attendance.routes.js";
+import faceRecognitionRoutes from "./modules/face-recognition/face-recognition.routes.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import classRoutes from "./modules/classes/class.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
@@ -31,7 +32,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "4mb" }));
 app.use(cookieParser());
 app.use(csrfProtection);
 
@@ -46,6 +47,7 @@ app.use("/api/v1/classes", classRoutes);
 app.use("/api/v1/teachers", teacherRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/attendance", attendanceRoutes);
+app.use("/api/v1", faceRecognitionRoutes);
 app.use("/api/v1", requireAuth);
 app.use(notFoundHandler);
 app.use(errorHandler);

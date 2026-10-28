@@ -17,6 +17,13 @@ const studentSchema = new Schema({
   guardianName: { type: String, trim: true, maxlength: 120 },
   guardianPhone: { type: String, trim: true, maxlength: 40 },
   avatarUrl: { type: String, trim: true, maxlength: 2048 },
+  faceAuthorization: {
+    status: { type: String, enum: ["not-authorized", "authorized", "revoked"], default: "not-authorized" },
+    reference: { type: String, trim: true, maxlength: 160 },
+    authorizedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    authorizedAt: { type: Date },
+    revokedAt: { type: Date },
+  },
   isActive: { type: Boolean, default: true, index: true },
   isDemo: { type: Boolean, default: false, select: false },
 }, { timestamps: true });

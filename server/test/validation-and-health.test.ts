@@ -8,6 +8,12 @@ Object.assign(process.env, {
   CLIENT_ORIGIN: "http://localhost:5173",
   JWT_SECRET: "test-only-secret-that-is-never-used-for-a-session",
   COOKIE_SECURE: "false",
+  RECOGNITION_SERVICE_URL: "http://127.0.0.1:8001",
+  RECOGNITION_SERVICE_SECRET: "test-only-private-recognition-service-secret",
+  RECOGNITION_MODEL_ID: "test-model",
+  RECOGNITION_MODEL_VERSION: "test-version",
+  FACE_TEMPLATE_KEY: Buffer.alloc(32, 17).toString("base64"),
+  FACE_MATCH_THRESHOLD: "0.81",
 });
 
 const [{ parseEnvironment }, { updateAttendanceSchema }, { studentListQuerySchema }, { getHealthPayload }] = await Promise.all([
@@ -20,6 +26,8 @@ const [{ parseEnvironment }, { updateAttendanceSchema }, { studentListQuerySchem
 test("environment parsing rejects missing or unsafe required configuration", () => {
   assert.throws(() => parseEnvironment({ MONGODB_URI: "mongodb://127.0.0.1/db", JWT_SECRET: "short" }));
   assert.throws(() => parseEnvironment({ NODE_ENV: "production", MONGODB_URI: "mongodb://127.0.0.1/db", JWT_SECRET: "x".repeat(48), CLIENT_ORIGIN: "http://school.example", COOKIE_SECURE: "false" }));
+  assert.throws(() => parseEnvironment({ NODE_ENV: "production", MONGODB_URI: "mongodb://127.0.0.1/db", JWT_SECRET: "x".repeat(48), CLIENT_ORIGIN: "https://school.example", COOKIE_SECURE: "true", RECOGNITION_SERVICE_URL: "http://recognition.internal", RECOGNITION_SERVICE_SECRET: "s".repeat(40), RECOGNITION_MODEL_ID: "licensed-model", RECOGNITION_MODEL_VERSION: "1", FACE_TEMPLATE_KEY: Buffer.alloc(32, 18).toString("base64") }));
+  assert.doesNotThrow(() => parseEnvironment({ NODE_ENV: "development", MONGODB_URI: "mongodb://127.0.0.1/db", JWT_SECRET: "x".repeat(48), RECOGNITION_SERVICE_URL: "http://127.0.0.1:8001", RECOGNITION_SERVICE_SECRET: "replace_with_a_random_internal_secret_at_least_32_chars", RECOGNITION_MODEL_ID: "unconfigured", RECOGNITION_MODEL_VERSION: "unconfigured" }));
 });
 
 test("manual attendance validation rejects face method and invalid pagination", () => {

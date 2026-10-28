@@ -57,6 +57,13 @@ const environmentSchema = z
     SEED_HOD_EMAIL: z.string().email().optional(),
 
     SEED_HOD_PASSWORD: z.string().min(12).optional(),
+
+    RECOGNITION_SERVICE_URL: z.string().url().optional(),
+    RECOGNITION_SERVICE_SECRET: z.string().min(32).optional(),
+    RECOGNITION_MODEL_ID: z.string().trim().min(1).optional(),
+    RECOGNITION_MODEL_VERSION: z.string().trim().min(1).optional(),
+    FACE_MATCH_THRESHOLD: z.coerce.number().min(-1).max(1).default(0.7),
+    FACE_TEMPLATE_KEY: z.string().optional(),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === "production" && !value.COOKIE_SECURE) {
@@ -76,6 +83,33 @@ const environmentSchema = z
         path: ["COOKIE_SAME_SITE"],
         message: "none requires COOKIE_SECURE=true",
       });
+    }
+
+    if (value.NODE_ENV === "production") {
+      for (const key of ["RECOGNITION_SERVICE_URL", "RECOGNITION_SERVICE_SECRET", "RECOGNITION_MODEL_ID", "RECOGNITION_MODEL_VERSION", "FACE_TEMPLATE_KEY"] as const) {
+        if (!value[key]) context.addIssue({ code: "custom", path: [key], message: "is required in production before face recognition can be enabled" });
+      }
+      for (const key of ["RECOGNITION_MODEL_ID", "RECOGNITION_MODEL_VERSION"] as const) {
+        if (value[key]?.toLowerCase() === "unconfigured" || value[key]?.toLowerCase().includes("replace_with")) {
+          context.addIssue({ code: "custom", path: [key], message: "must name an authorized, configured recognition model in production" });
+        }
+      }
+      if (value.RECOGNITION_SERVICE_SECRET?.toLowerCase().includes("replace_with")) {
+        context.addIssue({ code: "custom", path: ["RECOGNITION_SERVICE_SECRET"], message: "must not be the example placeholder in production" });
+      }
+      if (value.RECOGNITION_SERVICE_URL && !value.RECOGNITION_SERVICE_URL.startsWith("https://")) {
+        context.addIssue({ code: "custom", path: ["RECOGNITION_SERVICE_URL"], message: "must use HTTPS in production" });
+      }
+    }
+    if (value.RECOGNITION_SERVICE_SECRET && value.RECOGNITION_SERVICE_SECRET.length < 32) {
+      context.addIssue({ code: "custom", path: ["RECOGNITION_SERVICE_SECRET"], message: "must be at least 32 characters" });
+    }
+    if (value.FACE_TEMPLATE_KEY) {
+      try {
+        if (!/^[A-Za-z0-9+/]{43}=$/.test(value.FACE_TEMPLATE_KEY) || Buffer.from(value.FACE_TEMPLATE_KEY, "base64").length !== 32) throw new Error();
+      } catch {
+        context.addIssue({ code: "custom", path: ["FACE_TEMPLATE_KEY"], message: "must be a base64-encoded 32-byte AES-256 key" });
+      }
     }
 
     if (
@@ -108,6 +142,10 @@ export function parseEnvironment(
       .join("; ");
 
     throw new Error(`Invalid server environment: ${details}`);
+  }
+
+  if (parsed.data.NODE_ENV === "production" && input.FACE_MATCH_THRESHOLD === undefined) {
+    throw new Error("Invalid server environment: FACE_MATCH_THRESHOLD must be explicitly set from an authorized evaluation before production use");
   }
 
   return parsed.data;

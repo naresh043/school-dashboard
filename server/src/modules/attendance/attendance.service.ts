@@ -99,8 +99,9 @@ export async function setManualAttendance(sessionId: string, studentId: string, 
       method: "manual" as const,
       markedBy: new Types.ObjectId(userId),
       remarks: input.remarks,
+      ...(input.status === "absent" ? {} : { markedAt: new Date() }),
     },
-    ...(input.status === "absent" ? { $unset: { markedAt: 1 } } : { $set: { markedAt: new Date() } }),
+    ...(input.status === "absent" ? { $unset: { markedAt: 1 } } : {}),
     $setOnInsert: { studentId: student._id, classId: session.classId, sessionId: session._id },
   };
   try {
