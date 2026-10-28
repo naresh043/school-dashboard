@@ -22,13 +22,7 @@ export async function loginStaff(credentials) {
 }
 
 export async function logoutStaff() {
-  try {
-    return await api.post("/auth/logout");
-  } finally {
-    clearCsrfToken();
-  }
-}
-
-export function clearStaffCsrfToken() {
+  const response = await api.post("/auth/logout");
   clearCsrfToken();
+  return response;
 }

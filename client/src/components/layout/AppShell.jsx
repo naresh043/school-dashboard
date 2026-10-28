@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { SCHOOL_NAME } from "../../data/branding.js";
-import { clearStaffCsrfToken, currentUserQueryKey, logoutStaff } from "../../features/auth/authApi.js";
+import { currentUserQueryKey, logoutStaff } from "../../features/auth/authApi.js";
 import { useCurrentUser } from "../../features/auth/useCurrentUser.js";
 import { getApiErrorMessage } from "../../lib/api.js";
 
@@ -76,12 +76,15 @@ export default function AppShell({ children, title, subtitle }) {
     setLogoutError("");
     try {
       await logoutStaff();
-    } catch (error) {
-      clearStaffCsrfToken();
-      setLogoutError(getApiErrorMessage(error, "Could not sign out. Try again."));
-    } finally {
       queryClient.setQueryData(currentUserQueryKey, null);
       navigate("/login", { replace: true });
+    } catch (error) {
+      if (error?.response?.status === 401) {
+        queryClient.setQueryData(currentUserQueryKey, null);
+        navigate("/login", { replace: true });
+      } else {
+        setLogoutError(getApiErrorMessage(error, "Could not sign out. Try again."));
+      }
     }
   };
   return (

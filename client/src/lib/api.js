@@ -6,8 +6,6 @@ export const api = axios.create({
   withCredentials: true,
   timeout: 15000,
   withXSRFToken: false,
-  xsrfCookieName: "gs_vm_csrf",
-  xsrfHeaderName: "x-csrf-token",
   headers: { Accept: "application/json" },
 });
 
